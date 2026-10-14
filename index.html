@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今天吃什么 · 转盘</title>
+<style>
+  :root {
+    --wheel-size: 340px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #ffe8d6 0%, #ffd6e0 50%, #e0c3fc 100%);
+    padding: 24px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 28px;
+    color: #5b3a29;
+    letter-spacing: 2px;
+  }
+
+  main {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 48px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  /* ---------- 左侧：转盘区 ---------- */
+  .left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .wheel-wrap {
+    position: relative;
+    width: var(--wheel-size);
+    height: var(--wheel-size);
+  }
+
+  #wheel {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 8px solid #fff;
+    box-shadow: 0 0 0 4px #e0a3b0, 0 12px 30px rgba(0, 0, 0, 0.2);
+    will-change: transform;
+  }
+
+  #wheel.spinning {
+    transition: transform 4s cubic-bezier(0.12, 0.8, 0.08, 1);
+  }
+
+  .label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+    transform-origin: 0 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  #pointer {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 16px solid transparent;
+    border-right: 16px solid transparent;
+    border-top: 28px solid #d64545;
+    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.3));
+    z-index: 10;
+  }
+
+  #hub {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: #fff;
+    border: 4px solid #e0a3b0;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+    z-index: 5;
+  }
+
+  #spinBtn {
+    padding: 14px 44px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #ff7e5f, #feb47b);
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    letter-spacing: 4px;
+    box-shadow: 0 6px 16px rgba(255, 126, 95, 0.4);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  #spinBtn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(255, 126, 95, 0.5);
+  }
+
+  #spinBtn:active:not(:disabled) { transform: translateY(0); }
+  #spinBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  #result {
+    min-height: 30px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #5b3a29;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #result.show { opacity: 1; }
+
+  /* ---------- 右侧：可编辑清单 ---------- */
+  .panel {
+    width: 280px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .panel h2 {
+    margin: 0 0 12px;
+    font-size: 18px;
+    color: #5b3a29;
+  }
+
+  .hint {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #6b4a34;
+    background: #fff4e6;
+    border: 1px solid #ffd9a0;
+    border-radius: 8px;
+  }
+  .hint .icon { font-size: 15px; }
+
+  #foodList {
+    list-style: none;
+    margin: 0 0 14px;
+    padding: 0;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  #foodList li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    background: #faf4f6;
+  }
+
+  .food-name {
+    flex: 1;
+    cursor: pointer;
+    font-size: 15px;
+    color: #4a3526;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .food-name:hover { color: #d64545; text-decoration: underline; }
+
+  .edit-input {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 15px;
+    border: 1px solid #e0a3b0;
+    border-radius: 6px;
+    outline: none;
+  }
+
+  #foodList li button {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 4px;
+    border-radius: 6px;
+    color: #c98b8b;
+  }
+  #foodList li button:hover { background: #ffe3e3; color: #d64545; }
+
+  .add-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .add-row input {
+    flex: 1;
+    padding: 9px 12px;
+    font-size: 15px;
+    border: 1px solid #e0a3b0;
+    border-radius: 8px;
+    outline: none;
+  }
+  .add-row input:focus { border-color: #d64545; }
+
+  .add-row button {
+    padding: 9px 16px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    background: #d64545;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .add-row button:hover { background: #bf3838; }
+
+  #status {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: #c0392b;
+    min-height: 18px;
+  }
+
+  /* ---------- 地图弹窗 ---------- */
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  .modal.show { display: flex; }
+
+  .modal-card {
+    background: #fff;
+    border-radius: 16px;
+    width: min(680px, 100%);
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    gap: 12px;
+  }
+  .modal-head h2 { margin: 0; font-size: 18px; color: #5b3a29; }
+
+  #closeModal {
+    border: none;
+    background: #f2f2f2;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    color: #666;
+  }
+  #closeModal:hover { background: #e5e5e5; }
+
+  #map {
+    width: 100%;
+    height: 300px;
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
+
+  #merchantList { list-style: none; margin: 0; padding: 0; }
+  #merchantList li {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px;
+    border-bottom: 1px solid #f0e6e6;
+  }
+  #merchantList li:last-child { border-bottom: none; }
+
+  .rank {
+    flex: 0 0 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #d64545;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .info { flex: 1; min-width: 0; }
+  .info .name { font-size: 16px; font-weight: 700; color: #4a3526; }
+  .info .addr { font-size: 13px; color: #8a8a8a; margin-top: 2px; }
+  .info .meta { font-size: 13px; color: #c0392b; margin-top: 4px; }
+  .tel { color: #c0392b; text-decoration: none; margin-left: 8px; }
+
+  .go {
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    background: #ff7e5f;
+    color: #fff;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .go:hover { background: #f06a4a; }
+
+  #merchantList .loading,
+  #merchantList .empty {
+    color: #8a8a8a;
+    text-align: center;
+    padding: 24px 0;
+    border-bottom: none;
+  }
+
+  .marker {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #d64545;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+  .marker.center { background: #3b82f6; }
+</style>
+</head>
+<body>
+  <h1>🎯 今天吃什么？</h1>
+
+  <main>
+    <!-- 左侧转盘 -->
+    <div class="left">
+      <div class="wheel-wrap">
+        <div id="pointer"></div>
+        <div id="wheel"></div>
+        <div id="hub"></div>
+      </div>
+      <button id="spinBtn">开 始</button>
+      <div id="result"></div>
+    </div>
+
+    <!-- 右侧可编辑清单 -->
+    <aside class="panel">
+      <h2>🍜 食物清单</h2>
+      <div class="hint">
+        <span class="icon">💡</span>
+        <span>点击食物名可编辑，点 ✕ 删除；在下方输入框填写后点「添加」。至少保留 2 项。</span>
+      </div>
+      <ul id="foodList"></ul>
+      <div class="add-row">
+        <input id="foodInput" type="text" placeholder="输入新食物，如：饺子" maxlength="12">
+        <button id="addBtn">添加</button>
+      </div>
+      <p id="status"></p>
+    </aside>
+  </main>
+
+  <!-- 地图弹窗 -->
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 id="modalTitle">附近商家</h2>
+        <button id="closeModal" title="关闭">✕</button>
+      </div>
+      <div id="map"></div>
+      <ul id="merchantList"></ul>
+    </div>
+  </div>
+
+<script>
+  // ===== 可编辑的食物清单 =====
+  let foods = [
+    '火锅', '烧烤', '奶茶', '寿司',
+    '披萨', '麻辣烫', '汉堡', '蛋糕'
+  ];
+
+  const colors = [
+    '#f94144', '#f3722c', '#f8961e', '#f9c74f',
+    '#90be6d', '#43aa8b', '#577590', '#7b5ea7'
+  ];
+
+  // ===== 高德地图配置（需要你自己的 Key）=====
+  // 1. 到 https://lbs.amap.com 注册并创建「Web端(JS API)」应用
+  // 2. 复制 Key 和「安全密钥」填到下面两处
+  const AMAP_KEY = 'e56061238050c15094f58b2cbde17857';
+  const AMAP_SECURITY = 'a904ac4291ffc212497e9c119b7920f1';
+  window._AMapSecurityConfig = { securityJsCode: AMAP_SECURITY };
+  const DEFAULT_CENTER = [116.397428, 39.90923]; // 北京天安门（定位失败时的兜底）
+
+  const wheel = document.getElementById('wheel');
+  const spinBtn = document.getElementById('spinBtn');
+  const result = document.getElementById('result');
+  const list = document.getElementById('foodList');
+  const foodInput = document.getElementById('foodInput');
+  const addBtn = document.getElementById('addBtn');
+  const status = document.getElementById('status');
+  const modal = document.getElementById('modal');
+  const modalTitle = document.getElementById('modalTitle');
+  const closeModalBtn = document.getElementById('closeModal');
+  const mapContainer = document.getElementById('map');
+  const merchantListEl = document.getElementById('merchantList');
+
+  const MIN = 2;
+  let rotation = 0;
+  let spinning = false;
+  let map = null;
+  let placeSearch = null;
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function formatDistance(m) {
+    return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;
+  }
+
+  // ===== 转盘 =====
+  function drawWheel() {
+    const n = foods.length;
+    const seg = 360 / n;
+    const stops = foods.map((_, i) =>
+      `${colors[i % colors.length]} ${i * seg}deg ${(i + 1) * seg}deg`
+    );
+    wheel.style.background = `conic-gradient(${stops.join(', ')})`;
+
+    wheel.innerHTML = '';
+    foods.forEach((food, i) => {
+      const centerAngle = i * seg + seg / 2;
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = food;
+      label.style.transform =
+        `rotate(${centerAngle}deg) translateY(${-(340 - 16) / 2 * 0.68}px)`;
+      wheel.appendChild(label);
+    });
+  }
+
+  function renderList() {
+    list.innerHTML = '';
+    foods.forEach((food, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <span class="food-name" data-index="${i}" title="点击编辑">${escapeHtml(food)}</span>
+        <button class="del" data-index="${i}" title="删除">✕</button>
+      `;
+      list.appendChild(li);
+    });
+    updateStatus();
+  }
+
+  function updateStatus() {
+    status.textContent = foods.length < MIN
+      ? `⚠️ 至少需要 ${MIN} 个食物才能转动转盘。`
+      : '';
+  }
+
+  function onChange() {
+    rotation = 0;
+    spinning = false;
+    wheel.classList.remove('spinning');
+    wheel.style.transform = 'rotate(0deg)';
+    result.classList.remove('show');
+    drawWheel();
+    renderList();
+  }
+
+  function startEdit(index) {
+    const li = list.children[index];
+    const nameSpan = li.querySelector('.food-name');
+    const input = document.createElement('input');
+    input.className = 'edit-input';
+    input.value = foods[index];
+    input.maxLength = 12;
+    li.replaceChild(input, nameSpan);
+    input.focus();
+    input.select();
+
+    const commit = () => {
+      const val = input.value.trim();
+      if (val) foods[index] = val;
+      onChange();
+    };
+    input.addEventListener('blur', commit, { once: true });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') input.blur();
+      if (e.key === 'Escape') { input.value = foods[index]; input.blur(); }
+    });
+  }
+
+  list.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('.del');
+    const nameSpan = e.target.closest('.food-name');
+    if (delBtn) {
+      const i = Number(delBtn.dataset.index);
+      if (foods.length <= MIN) {
+        status.textContent = `⚠️ 至少需要 ${MIN} 个食物，无法继续删除。`;
+        return;
+      }
+      foods.splice(i, 1);
+      onChange();
+    } else if (nameSpan) {
+      startEdit(Number(nameSpan.dataset.index));
+    }
+  });
+
+  function addFood() {
+    const val = foodInput.value.trim();
+    if (!val) { foodInput.focus(); return; }
+    foods.push(val);
+    foodInput.value = '';
+    onChange();
+  }
+  addBtn.addEventListener('click', addFood);
+  foodInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addFood(); });
+
+  function getResult(finalRotation) {
+    const seg = 360 / foods.length;
+    const pointedAngle = (360 - (finalRotation % 360)) % 360;
+    return foods[Math.floor(pointedAngle / seg)];
+  }
+
+  function spin() {
+    if (spinning || foods.length < MIN) return;
+    spinning = true;
+    spinBtn.disabled = true;
+    result.classList.remove('show');
+
+    const extraTurns = 5 + Math.floor(Math.random() * 5);
+    const randomOffset = Math.floor(Math.random() * 360);
+    rotation += extraTurns * 360 + randomOffset;
+
+    wheel.classList.add('spinning');
+    wheel.style.transform = `rotate(${rotation}deg)`;
+  }
+
+  wheel.addEventListener('transitionend', () => {
+    if (!spinning) return;
+    spinning = false;
+    wheel.classList.remove('spinning');
+    spinBtn.disabled = false;
+
+    const food = getResult(rotation);
+    result.textContent = `🍽️ 抽中了：${food}！`;
+    result.classList.add('show');
+
+    showMerchants(food); // 抽中后弹出地图，搜索附近 3 家商家
+  });
+
+  spinBtn.addEventListener('click', spin);
+
+  // ===== 地图逻辑 =====
+  function openModal(food) {
+    modalTitle.textContent = `🍽️ 抽中了「${food}」——附近 3 家推荐`;
+    modal.classList.add('show');
+  }
+
+  function closeModal() {
+    modal.classList.remove('show');
+  }
+  closeModalBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  function loadAmap() {
+    return new Promise((resolve, reject) => {
+      if (window.AMap) return resolve();
+      if (!AMAP_KEY || AMAP_KEY.indexOf('你的') === 0) {
+        return reject(new Error('请先在高德开放平台申请 Key，填入代码中的 AMAP_KEY 与 AMAP_SECURITY。'));
+      }
+      const s = document.createElement('script');
+      s.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}&plugin=AMap.PlaceSearch`;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('地图脚本加载失败，请检查网络或 Key 是否正确。'));
+      document.head.appendChild(s);
+    });
+  }
+
+  function initMap() {
+    return new Promise((resolve, reject) => {
+      if (map) {
+        setTimeout(() => map.resize(), 100);
+        return resolve();
+      }
+      if (!window.AMap) return reject(new Error('高德地图加载失败。'));
+      map = new AMap.Map('map', { zoom: 14, resizeEnable: true });
+      AMap.plugin(['AMap.PlaceSearch'], () => {
+        placeSearch = new AMap.PlaceSearch({ pageSize: 3, pageIndex: 1 });
+        resolve();
+      });
+    });
+  }
+
+  function getLocation() {
+    return new Promise((resolve) => {
+      const fallback = { lng: DEFAULT_CENTER[0], lat: DEFAULT_CENTER[1] };
+      if (!navigator.geolocation) return resolve(fallback);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lng: pos.coords.longitude, lat: pos.coords.latitude }),
+        () => resolve(fallback),
+        { timeout: 6000, maximumAge: 60000 }
+      );
+    });
+  }
+
+  function addMarker(lng, lat, title, html) {
+    const marker = new AMap.Marker({
+      position: [lng, lat],
+      title,
+      content: html
+    });
+    marker.setMap(map);
+    return marker;
+  }
+
+  function renderMerchants(pois) {
+    merchantListEl.innerHTML = '';
+    if (!pois.length) {
+      merchantListEl.innerHTML = '<li class="empty">未找到相关商家，换个关键词或扩大范围试试。</li>';
+      return;
+    }
+    pois.forEach((poi, i) => {
+      const lng = poi.location.lng;
+      const lat = poi.location.lat;
+      addMarker(lng, lat, poi.name, `<div class="marker">${i + 1}</div>`);
+
+      const tel = poi.tel
+        ? `<a class="tel" href="tel:${poi.tel}">📞 ${poi.tel}</a>`
+        : '';
+      const addr = [poi.pname, poi.cityname, poi.adname, poi.address]
+        .filter(Boolean).join('');
+      const nav = `https://uri.amap.com/navigation?to=${lng},${lat},${encodeURIComponent(poi.name)}&mode=car`;
+
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <div class="rank">${i + 1}</div>
+        <div class="info">
+          <div class="name">${escapeHtml(poi.name)}</div>
+          <div class="addr">${escapeHtml(addr)}</div>
+          <div class="meta">${formatDistance(poi.distance)}${tel}</div>
+        </div>
+        <a class="go" href="${nav}" target="_blank" rel="noopener">去这里</a>
+      `;
+      merchantListEl.appendChild(li);
+    });
+  }
+
+  function searchNearBy(food, lng, lat) {
+    if (!placeSearch) {
+      merchantListEl.innerHTML = '<li class="empty">地图搜索服务未就绪。</li>';
+      return;
+    }
+    placeSearch.searchNearBy(food, new AMap.LngLat(lng, lat), 3000, (status, result) => {
+      if (status === 'complete' && result.poiList && result.poiList.pois) {
+        renderMerchants(result.poiList.pois.slice(0, 3));
+      } else {
+        merchantListEl.innerHTML = '<li class="empty">未找到相关商家，换个关键词试试。</li>';
+      }
+    });
+  }
+
+  async function showMerchants(food) {
+    openModal(food);
+    merchantListEl.innerHTML = '<li class="loading">正在定位并搜索附近商家…</li>';
+    try {
+      await loadAmap();
+      await initMap();
+      const { lng, lat } = await getLocation();
+      map.setCenter([lng, lat]);
+      map.setZoom(14);
+      addMarker(lng, lat, '我的位置', '<div class="marker center">我</div>');
+      searchNearBy(food, lng, lat);
+    } catch (err) {
+      merchantListEl.innerHTML = `<li class="empty">${escapeHtml(err.message || '地图加载失败')}</li>`;
+    }
+  }
+
+  onChange();
+</script>
+</body>
+</html>

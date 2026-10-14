@@ -1,0 +1,8 @@
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
+.DS_Store
